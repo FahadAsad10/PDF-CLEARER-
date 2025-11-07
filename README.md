@@ -6,6 +6,7 @@ A beautiful Streamlit web application that enhances PDF documents for better rea
 - 🌈 **Contrast Enhancement** - Improve text clarity
 - 💡 **Brightness Control** - Adjust brightness levels
 - 🌙 **Dark Reading Mode** - Comfortable dark theme for text display
+- 📝 **Text Extraction** - Extract text using OCR (Tesseract) and pdfplumber
 - 🗣️ **Text-to-Speech** - Listen to your documents
 - 📄 **PDF Export** - Export enhanced pages as a new PDF
 
