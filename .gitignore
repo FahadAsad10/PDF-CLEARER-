@@ -40,6 +40,28 @@ env/
 .DS_Store
 Thumbs.db
 
+# Windows System Files
+AppData/
+Contacts/
+Desktop/
+Documents/
+Downloads/
+Favorites/
+Links/
+Music/
+OneDrive/
+Pictures/
+Saved Games/
+Searches/
+Videos/
+NTUSER.DAT*
+ntuser.dat.*
+ntuser.ini
+*.exe
+*.blf
+*.regtrans-ms
+*.LOG*
+
 # Project specific
 *.pdf
 !requirements.txt
