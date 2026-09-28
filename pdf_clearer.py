@@ -3,7 +3,6 @@ import os
 from datetime import datetime
 
 import fitz
-import pdfplumber
 import pytesseract
 import streamlit as st
 from PIL import Image, ImageEnhance
@@ -24,9 +23,7 @@ st.markdown("""
     background: rgba(15, 32, 47, 0.96);
 }
 .block-container { padding: 2rem 3rem 3rem; max-width: 1400px; }
-.hero {
-    text-align: center; padding: 1rem 0 1.5rem;
-}
+.hero { text-align: center; padding: 1rem 0 1.5rem; }
 .hero h1 { color: #a8e6ff; margin-bottom: .35rem; }
 .hero p { color: #d9faff; font-size: 1.05rem; }
 .card {
@@ -56,9 +53,13 @@ tts_enabled = st.sidebar.toggle("🗣️ Text-to-Speech")
 export_enabled = st.sidebar.toggle("📄 Enable Clean PDF Export", True)
 
 st.sidebar.divider()
-st.sidebar.caption("Tip: For scanned PDFs, enable OCR. For normal digital PDFs, direct text extraction is faster.")
+st.sidebar.caption(
+    "Tip: Digital PDFs use fast text extraction. OCR is only used for pages "
+    "that do not contain selectable text."
+)
 
 uploaded_file = st.file_uploader("📂 Upload a PDF", type=["pdf"])
+
 
 def enhance_page(page, zoom, contrast, brightness):
     pix = page.get_pixmap(
@@ -67,16 +68,12 @@ def enhance_page(page, zoom, contrast, brightness):
         colorspace=fitz.csRGB,
     )
     image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-    image = ImageEnhance.Contrast(image).enhance(contrast)
-    image = ImageEnhance.Brightness(image).enhance(brightness)
+    if contrast != 1.0:
+        image = ImageEnhance.Contrast(image).enhance(contrast)
+    if brightness != 1.0:
+        image = ImageEnhance.Brightness(image).enhance(brightness)
     return image
 
-def extract_text_direct(file_bytes):
-    parts = []
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for page in pdf.pages:
-            parts.append(page.extract_text() or "")
-    return "\n\n".join(parts).strip()
 
 def configure_tesseract():
     configured = os.getenv("TESSERACT_CMD")
@@ -85,8 +82,8 @@ def configure_tesseract():
         return True
 
     discovered = [
-        r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
-        r"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
         "/usr/bin/tesseract",
         "/usr/local/bin/tesseract",
     ]
@@ -101,38 +98,55 @@ def configure_tesseract():
     except Exception:
         return False
 
+
 @st.cache_data(show_spinner=False, max_entries=3)
-def process_pdf(file_bytes, zoom, contrast, brightness, use_ocr):
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    images = []
-    ocr_text = []
-    direct_text = extract_text_direct(file_bytes)
+def get_pdf_info(file_bytes):
+    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+        page_count = len(doc)
+        direct_text = [page.get_text("text").strip() for page in doc]
+    return page_count, direct_text
 
-    for page in doc:
-        image = enhance_page(page, zoom, contrast, brightness)
-        images.append(image)
-        if use_ocr:
-            ocr_text.append(pytesseract.image_to_string(image))
 
-    doc.close()
+@st.cache_data(show_spinner=False, max_entries=3)
+def ocr_missing_pages(file_bytes, missing_pages, zoom, contrast, brightness):
+    if not missing_pages:
+        return {}
 
-    if use_ocr and any(text.strip() for text in ocr_text):
-        text = "\n\n".join(ocr_text).strip()
-    else:
-        text = direct_text
+    results = {}
+    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+        for page_number in missing_pages:
+            image = enhance_page(
+                doc[page_number],
+                zoom,
+                contrast,
+                brightness,
+            )
+            results[page_number] = pytesseract.image_to_string(image).strip()
+    return results
 
-    return images, text
 
-def build_clean_pdf(images):
+@st.cache_data(show_spinner=False, max_entries=3)
+def render_preview(file_bytes, page_number, zoom, contrast, brightness):
+    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+        return enhance_page(doc[page_number], zoom, contrast, brightness)
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def build_clean_pdf(file_bytes, zoom, contrast, brightness):
     output = fitz.open()
-    for image in images:
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG", optimize=True)
-        page = output.new_page(width=image.width, height=image.height)
-        page.insert_image(page.rect, stream=buffer.getvalue())
-    data = output.tobytes(garbage=4, deflate=True)
-    output.close()
-    return data
+    try:
+        with fitz.open(stream=file_bytes, filetype="pdf") as source:
+            for page in source:
+                image = enhance_page(page, zoom, contrast, brightness)
+                buffer = io.BytesIO()
+                image.save(buffer, format="PNG", optimize=True)
+                new_page = output.new_page(width=image.width, height=image.height)
+                new_page.insert_image(new_page.rect, stream=buffer.getvalue())
+
+        return output.tobytes(garbage=4, deflate=True)
+    finally:
+        output.close()
+
 
 if uploaded_file:
     file_bytes = uploaded_file.getvalue()
@@ -140,47 +154,66 @@ if uploaded_file:
 
     st.success(f"✅ {uploaded_file.name} uploaded • {file_size_mb:.2f} MB")
 
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    page_count = len(doc)
-    doc.close()
+    page_count, direct_text = get_pdf_info(file_bytes)
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Pages", page_count)
     c2.metric("File size", f"{file_size_mb:.2f} MB")
     c3.metric("OCR", "On" if ocr_enabled else "Off")
 
-    if ocr_enabled and not configure_tesseract():
-        st.warning(
-            "OCR is enabled, but Tesseract was not found. "
-            "Install Tesseract or set the TESSERACT_CMD environment variable. "
-            "The app will still use regular PDF text extraction."
-        )
-        use_ocr = False
-    else:
-        use_ocr = ocr_enabled
+    all_text_parts = list(direct_text)
+    missing_pages = [i for i, text in enumerate(direct_text) if not text.strip()]
 
-    with st.spinner("Enhancing your PDF…"):
-        images, all_text = process_pdf(
-            file_bytes,
-            zoom_level,
-            contrast_level,
-            brightness_level,
-            use_ocr,
-        )
+    use_ocr = False
+    if ocr_enabled and missing_pages:
+        if configure_tesseract():
+            use_ocr = True
+        else:
+            st.warning(
+                "OCR is enabled, but Tesseract was not found. "
+                "Regular PDF text extraction will still be used."
+            )
 
-    st.success("✨ PDF processed successfully!")
+    if use_ocr:
+        with st.spinner(f"Running OCR on {len(missing_pages)} scanned page(s)…"):
+            ocr_results = ocr_missing_pages(
+                file_bytes,
+                tuple(missing_pages),
+                zoom_level,
+                contrast_level,
+                brightness_level,
+            )
+        for page_number, text in ocr_results.items():
+            all_text_parts[page_number] = text
+
+    all_text = "\n\n".join(
+        text for text in all_text_parts if text.strip()
+    ).strip()
+
+    st.success(
+        f"✨ PDF processed • {len(missing_pages)} page(s) needed OCR"
+        if use_ocr
+        else "✨ PDF processed successfully!"
+    )
 
     st.subheader("📄 Enhanced Preview")
     preview_page = st.number_input(
         "Preview page",
         min_value=1,
-        max_value=len(images),
+        max_value=page_count,
         value=1,
         step=1,
     )
+    preview_image = render_preview(
+        file_bytes,
+        preview_page - 1,
+        zoom_level,
+        contrast_level,
+        brightness_level,
+    )
     st.image(
-        images[preview_page - 1],
-        caption=f"Enhanced Page {preview_page} of {len(images)}",
+        preview_image,
+        caption=f"Enhanced Page {preview_page} of {page_count}",
         use_container_width=True,
     )
 
@@ -211,6 +244,7 @@ if uploaded_file:
             if st.button("▶️ Read document aloud", use_container_width=True):
                 try:
                     import pyttsx3
+
                     engine = pyttsx3.init()
                     engine.say(all_text)
                     engine.runAndWait()
@@ -221,15 +255,28 @@ if uploaded_file:
     with col2:
         if export_enabled:
             st.subheader("📥 Export")
-            cleaned_pdf = build_clean_pdf(images)
-            export_name = f"cleaned_{os.path.splitext(uploaded_file.name)[0]}_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-            st.download_button(
-                "📥 Download Cleaned PDF",
-                data=cleaned_pdf,
-                file_name=export_name,
-                mime="application/pdf",
-                use_container_width=True,
+            export_name = (
+                f"cleaned_{os.path.splitext(uploaded_file.name)[0]}_"
+                f"{datetime.now():%Y%m%d_%H%M%S}.pdf"
             )
+            if st.button("⚙️ Prepare Cleaned PDF", use_container_width=True):
+                with st.spinner("Building cleaned PDF…"):
+                    st.session_state["cleaned_pdf"] = build_clean_pdf(
+                        file_bytes,
+                        zoom_level,
+                        contrast_level,
+                        brightness_level,
+                    )
+
+            cleaned_pdf = st.session_state.get("cleaned_pdf")
+            if cleaned_pdf:
+                st.download_button(
+                    "📥 Download Cleaned PDF",
+                    data=cleaned_pdf,
+                    file_name=export_name,
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
 else:
     st.info("📄 Upload a PDF to get started.")
