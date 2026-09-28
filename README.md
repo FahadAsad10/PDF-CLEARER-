@@ -13,7 +13,8 @@ A Streamlit app that makes difficult PDF documents easier to read, search, liste
 - 📝 Direct text extraction for digital PDFs
 - 🗣️ Optional text-to-speech
 - 📥 Export enhanced pages as a new PDF
-- ⚡ Cached processing to avoid re-processing the same document on every Streamlit interaction
+- ⚡ Cached processing to avoid unnecessary re-processing
+- 🚀 Streamlit Community Cloud-ready deployment
 - 🖥️ Automatic Tesseract detection on Windows/Linux/macOS-compatible environments
 
 ## Run locally
@@ -54,14 +55,27 @@ streamlit run pdf_clearer.py
 
 Then open the local URL shown by Streamlit.
 
+## Deploy to Streamlit Community Cloud
+
+This repository is ready for deployment on Streamlit Community Cloud.
+
+1. Sign in to Streamlit Community Cloud with GitHub.
+2. Create a new app.
+3. Select this repository and the `main` branch.
+4. Set the entrypoint to `pdf_clearer.py`.
+5. Deploy.
+
+The repository includes `requirements.txt` for Python packages and `packages.txt` for the Linux Tesseract dependency required by OCR. Text-to-speech is intended primarily for local use because it depends on the host machine's speech engine.
+
 ## How it works
 
 1. Upload a PDF.
 2. Choose enhancement settings from the sidebar.
-3. PDF pages are rendered and enhanced with PyMuPDF and Pillow.
-4. Text is extracted directly when possible, or with OCR for scanned pages.
-5. Preview the enhanced pages.
-6. Download a cleaned PDF or use the extracted text.
+3. Direct text is extracted first using PyMuPDF.
+4. Only pages without selectable text are sent through OCR.
+5. The selected preview page is rendered on demand instead of rendering the entire PDF immediately.
+6. A cleaned PDF is generated only when the user requests an export.
+7. Cached results prevent repeated work during normal Streamlit interactions.
 
 ## Tech stack
 
@@ -70,7 +84,6 @@ Then open the local URL shown by Streamlit.
 - **PyMuPDF**
 - **Pillow**
 - **Tesseract OCR / pytesseract**
-- **pdfplumber**
 - **pyttsx3**
 
 ## License
