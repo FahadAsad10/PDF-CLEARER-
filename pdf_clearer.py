@@ -17,20 +17,70 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+    background:
+        radial-gradient(circle at 10% 10%, rgba(56,189,248,.12), transparent 28%),
+        radial-gradient(circle at 90% 20%, rgba(99,102,241,.12), transparent 30%),
+        linear-gradient(135deg, #07131a 0%, #0b2028 52%, #102f3a 100%);
 }
+[data-testid="stHeader"] { background: transparent; }
 [data-testid="stSidebar"] {
-    background: rgba(15, 32, 47, 0.96);
+    background: rgba(5, 18, 25, .94);
+    border-right: 1px solid rgba(255,255,255,.08);
 }
-.block-container { padding: 2rem 3rem 3rem; max-width: 1400px; }
-.hero { text-align: center; padding: 1rem 0 1.5rem; }
-.hero h1 { color: #a8e6ff; margin-bottom: .35rem; }
-.hero p { color: #d9faff; font-size: 1.05rem; }
+.block-container { padding: 1.5rem 3rem 3rem; max-width: 1450px; }
+.hero {
+    text-align: center;
+    padding: 1.4rem 1rem 2rem;
+}
+.hero-badge {
+    display: inline-block;
+    padding: .35rem .8rem;
+    border: 1px solid rgba(168,230,255,.25);
+    border-radius: 999px;
+    background: rgba(168,230,255,.08);
+    color: #a8e6ff;
+    font-size: .82rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+}
+.hero h1 {
+    color: #f2fbff;
+    font-size: clamp(2.2rem, 5vw, 4rem);
+    margin: .7rem 0 .35rem;
+    letter-spacing: -.04em;
+}
+.hero p { color: #b9dce6; font-size: 1.08rem; margin: 0 auto; max-width: 700px; }
 .card {
-    background: rgba(255,255,255,.07);
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 16px;
-    padding: 1rem 1.2rem;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 18px;
+    padding: 1.2rem 1.35rem;
+    box-shadow: 0 14px 40px rgba(0,0,0,.16);
+}
+.feature-card {
+    min-height: 125px;
+    transition: transform .2s ease, border-color .2s ease;
+}
+.feature-card:hover { transform: translateY(-2px); border-color: rgba(168,230,255,.3); }
+.feature-icon { font-size: 1.5rem; }
+.feature-title { color: #f3fbff; font-weight: 700; margin: .45rem 0 .25rem; }
+.feature-text { color: #a9cbd4; font-size: .9rem; }
+div[data-testid="stFileUploader"] {
+    background: rgba(255,255,255,.045);
+    border: 1px dashed rgba(168,230,255,.35);
+    border-radius: 18px;
+    padding: .7rem;
+}
+div[data-testid="stMetric"] {
+    background: rgba(255,255,255,.045);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: .8rem 1rem;
+}
+.stButton > button, .stDownloadButton > button {
+    border-radius: 10px;
+    font-weight: 650;
+    min-height: 2.7rem;
 }
 footer { visibility: hidden; }
 </style>
@@ -38,8 +88,9 @@ footer { visibility: hidden; }
 
 st.markdown("""
 <div class="hero">
+  <div class="hero-badge">SMART PDF ENHANCEMENT TOOL</div>
   <h1>📘 PDF Clearer</h1>
-  <p>Make difficult PDFs easier to read, search, listen to, and export.</p>
+  <p>Turn hard-to-read PDFs into clearer, searchable, and exportable documents.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -58,7 +109,13 @@ st.sidebar.caption(
     "that do not contain selectable text."
 )
 
-uploaded_file = st.file_uploader("📂 Upload a PDF", type=["pdf"])
+st.markdown("### 📂 Upload your document")
+uploaded_file = st.file_uploader(
+    "Drop a PDF here or click Browse files",
+    type=["pdf"],
+    label_visibility="collapsed",
+)
+
 
 
 def enhance_page(page, zoom, contrast, brightness):
@@ -151,8 +208,16 @@ def build_clean_pdf(file_bytes, zoom, contrast, brightness):
 if uploaded_file:
     file_bytes = uploaded_file.getvalue()
     file_size_mb = len(file_bytes) / (1024 * 1024)
+    upload_key = f"{uploaded_file.name}:{len(file_bytes)}"
+    if st.session_state.get("upload_key") != upload_key:
+        st.session_state.pop("cleaned_pdf", None)
+        st.session_state["upload_key"] = upload_key
 
-    st.success(f"✅ {uploaded_file.name} uploaded • {file_size_mb:.2f} MB")
+    st.markdown(
+        f'<div class="card"><strong>📄 {uploaded_file.name}</strong>'
+        f'<span style="color:#9ec5d0;"> &nbsp;•&nbsp; {file_size_mb:.2f} MB</span></div>',
+        unsafe_allow_html=True,
+    )
 
     page_count, direct_text = get_pdf_info(file_bytes)
 
@@ -191,9 +256,9 @@ if uploaded_file:
     ).strip()
 
     st.success(
-        f"✨ PDF processed • {len(missing_pages)} page(s) needed OCR"
+        f"✨ Ready • {len(missing_pages)} page(s) used OCR"
         if use_ocr
-        else "✨ PDF processed successfully!"
+        else "✨ Ready • fast text extraction used"
     )
 
     st.subheader("📄 Enhanced Preview")
@@ -219,9 +284,11 @@ if uploaded_file:
 
     st.subheader("📝 Extracted Text")
     if dark_mode:
+        import html
+        safe_text = html.escape(all_text or "No text could be extracted.")
         st.markdown(
             f'<div class="card"><pre style="white-space:pre-wrap;color:#e6faff;">'
-            f'{all_text or "No text could be extracted."}</pre></div>',
+            f'{safe_text}</pre></div>',
             unsafe_allow_html=True,
         )
     else:
@@ -279,15 +346,33 @@ if uploaded_file:
                 )
 
 else:
-    st.info("📄 Upload a PDF to get started.")
     st.markdown("""
     <div class="card">
-    <h3>What you can do</h3>
-    <p>✨ Improve contrast and brightness &nbsp; • &nbsp; 🔎 Extract text with OCR<br>
-    🌙 Use a dark reading mode &nbsp; • &nbsp; 🔊 Listen to extracted text<br>
-    📥 Export an enhanced copy of your document</p>
+      <div style="font-size:1.15rem;font-weight:700;color:#f2fbff;">Built for difficult PDFs</div>
+      <div style="color:#a9cbd4;margin-top:.35rem;">
+        Upload a document to enhance readability, extract text, and create a cleaner copy.
+      </div>
     </div>
     """, unsafe_allow_html=True)
+
+    st.markdown("### ✨ What you can do")
+    f1, f2, f3, f4 = st.columns(4)
+    features = [
+        ("🔎", "Smart OCR", "OCR only the pages that need it."),
+        ("🌈", "Enhance", "Tune contrast, brightness, and zoom."),
+        ("🌙", "Read", "Use a comfortable dark reading mode."),
+        ("📥", "Export", "Generate a cleaned PDF when ready."),
+    ]
+    for col, (icon, title, description) in zip((f1, f2, f3, f4), features):
+        with col:
+            st.markdown(
+                f'<div class="card feature-card">'
+                f'<div class="feature-icon">{icon}</div>'
+                f'<div class="feature-title">{title}</div>'
+                f'<div class="feature-text">{description}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 st.divider()
 st.markdown(
