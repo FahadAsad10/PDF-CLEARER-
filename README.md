@@ -1,60 +1,78 @@
 # PDF Clearer ✨
 
-A beautiful Streamlit web application that enhances PDF documents for better readability. Features include:
+A Streamlit app that makes difficult PDF documents easier to read, search, listen to, and export.
 
-- 🔍 **Zoom/Magnification** - Adjust zoom levels for better visibility
-- 🌈 **Contrast Enhancement** - Improve text clarity
-- 💡 **Brightness Control** - Adjust brightness levels
-- 🌙 **Dark Reading Mode** - Comfortable dark theme for text display
-- 📝 **Text Extraction** - Extract text using OCR (Tesseract) and pdfplumber
-- 🗣️ **Text-to-Speech** - Listen to your documents
-- 📄 **PDF Export** - Export enhanced pages as a new PDF
+## Features
 
-## Installation
+- 📄 Upload PDF documents
+- 🔍 Adjustable rendering zoom
+- 🌈 Contrast enhancement
+- 💡 Brightness adjustment
+- 🌙 Dark reading mode
+- 🔎 OCR text extraction with Tesseract
+- 📝 Direct text extraction for digital PDFs
+- 🗣️ Optional text-to-speech
+- 📥 Export enhanced pages as a new PDF
+- ⚡ Cached processing to avoid re-processing the same document on every Streamlit interaction
+- 🖥️ Automatic Tesseract detection on Windows/Linux/macOS-compatible environments
 
-1. Install Python dependencies:
+## Run locally
+
+### 1. Install Python dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Install Tesseract OCR:
-   - Download from: https://github.com/UB-Mannheim/tesseract/wiki
-   - Install to default location: `C:\Program Files\Tesseract-OCR\`
-   - Or update the path in `pdf_clearer.py` if installed elsewhere
+### 2. Install Tesseract OCR
 
-## Usage
+OCR is optional, but recommended for scanned PDFs.
 
-Run the Streamlit app:
+**Windows:** install Tesseract and, if it is not detected automatically, set:
+
+```text
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt install tesseract-ocr
+```
+
+**macOS:**
+
+```bash
+brew install tesseract
+```
+
+### 3. Start the app
+
 ```bash
 streamlit run pdf_clearer.py
 ```
 
-Or using Python module:
-```bash
-python -m streamlit run pdf_clearer.py
-```
+Then open the local URL shown by Streamlit.
 
-The app will open in your default web browser.
+## How it works
 
-## Features
+1. Upload a PDF.
+2. Choose enhancement settings from the sidebar.
+3. PDF pages are rendered and enhanced with PyMuPDF and Pillow.
+4. Text is extracted directly when possible, or with OCR for scanned pages.
+5. Preview the enhanced pages.
+6. Download a cleaned PDF or use the extracted text.
 
-- Upload any PDF file
-- Adjust zoom, contrast, and brightness in the sidebar
-- View enhanced pages with improved clarity
-- Extract and view text content
-- Listen to text using text-to-speech
-- Download cleaned PDF with all enhancements
+## Tech stack
 
-## Technologies
-
-- Streamlit - Web framework
-- PyMuPDF (fitz) - PDF processing
-- Pillow - Image enhancement
-- Tesseract OCR - Text extraction
-- pdfplumber - Alternative text extraction
-- pyttsx3 - Text-to-speech
+- **Python**
+- **Streamlit**
+- **PyMuPDF**
+- **Pillow**
+- **Tesseract OCR / pytesseract**
+- **pdfplumber**
+- **pyttsx3**
 
 ## License
 
 MIT
-
